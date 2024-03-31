@@ -475,8 +475,10 @@ impl pci::Driver for E1000Drv {
     fn remove(data: &Self::Data) {
         pr_info!("Rust for linux e1000 driver demo (remove)\n");
 
-        drop(&data.netdev_reg);
-        unsafe { bindings::pci }
+        drop(&data._netdev_reg);
+        unsafe { bindings::pci_release_selected_regions(dev.get_ptr(), data.bars) };
+        unsafe { bindings::pci_disable_device(dev.get_ptr()) };
+        drop(data);
     }
 }
 struct E1000KernelMod {
