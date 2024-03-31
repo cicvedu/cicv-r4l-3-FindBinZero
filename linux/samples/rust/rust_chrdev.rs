@@ -18,13 +18,11 @@ module! {
     license: "GPL",
 }
 
-static GLOBALMEM_BUF: Mutex<[u8;GLOBALMEM_SIZE]> = unsafe {
-    Mutex::new([0u8;GLOBALMEM_SIZE])
-};
+static GLOBALMEM_BUF: Mutex<[u8; GLOBALMEM_SIZE]> = unsafe { Mutex::new([0u8; GLOBALMEM_SIZE]) };
 
 struct RustFile {
     #[allow(dead_code)]
-    inner: &'static Mutex<[u8;GLOBALMEM_SIZE]>,
+    inner: &'static Mutex<[u8; GLOBALMEM_SIZE]>,
 }
 
 #[vtable]
@@ -32,19 +30,33 @@ impl file::Operations for RustFile {
     type Data = Box<Self>;
 
     fn open(_shared: &(), _file: &file::File) -> Result<Box<Self>> {
-        Ok(
-            Box::try_new(RustFile {
-                inner: &GLOBALMEM_BUF
-            })?
-        )
+        Ok(Box::try_new(RustFile {
+            inner: &GLOBALMEM_BUF,
+        })?)
     }
 
-    fn write(_this: &Self,_file: &file::File,_reader: &mut impl kernel::io_buffer::IoBufferReader,_offset:u64,) -> Result<usize> {
-        Err(EPERM)
+    fn write(
+        _this: &Self,
+        _file: &file::File,
+        _reader: &mut impl kernel::io_buffer::IoBufferReader,
+        _offset: u64,
+    ) -> Result<usize> {
+        let length: usize = _reader.len();
+        let content = &mut *_this.inner.lock();
+        _reader.read_slice(&mut content[0..length])?;
+        Ok(length)
     }
 
-    fn read(_this: &Self,_file: &file::File,_writer: &mut impl kernel::io_buffer::IoBufferWriter,_offset:u64,) -> Result<usize> {
-        Err(EPERM)
+    fn read(
+        _this: &Self,
+        _file: &file::File,
+        _writer: &mut impl kernel::io_buffer::IoBufferWriter,
+        _offset: u64,
+    ) -> Result<usize> {
+        let contents = &mut *_this.inner.lock();
+        let data = &contents[_offset as usize..];
+        _writer.write_slice(data)?;
+        Ok(data.len())
     }
 }
 
